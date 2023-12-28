@@ -40,7 +40,7 @@ Plot both:
 
 
 
-If users want to using different methods，users can choose method 1-7 and click plot again.
+Users can choose method 1-7 and click plot again.
 The 7 methods:
 
 ![image](https://github.com/1109David2001/Relay-Trip-Comparison-App/assets/155039981/5fadebc4-74af-40f3-9eb7-90d2f47db805)
