@@ -191,41 +191,44 @@ class Difftest:
         min_value = self.pick_up
         max_value = self.Highest
         # Plot standard trip curve
-        try:
-            x_values = np.arange(0, float(self.x_max), 0.001)
-        except ValueError as e:
-            messagebox.showerror("Error", f"Invalid X-Max value: {e}")
-            return
+        if self.x_max is None:
+            messagebox.showerror("Error", "Invalid X-Max value")
+        else:
+            try:
+                x_values = np.arange(0, float(self.x_max), 0.001)
+            except ValueError as e:
+                messagebox.showerror("Error", f"Invalid X-Max value: {e}")
+                return
 
-        y_values = np.maximum.reduce([slopes * x_values - intercepts for slopes, intercepts in zip(slopes, intercepts)])
-        y_values = np.clip(y_values, min_value, max_value)
+            y_values = np.maximum.reduce([slopes * x_values - intercepts for slopes, intercepts in zip(slopes, intercepts)])
+            y_values = np.clip(y_values, min_value, max_value)
 
-        a.plot(x_values, y_values, label='Standard Trip Curve')
+            a.plot(x_values, y_values, label='Standard Trip Curve')
 
 
-        # Check if both 'Ibias' and 'Idiff' are defined as class attributes
-        if hasattr(self, 'Ibias') and hasattr(self, 'Idiff'):
-            Ibias_values = self.Ibias
-            Idiff_values = self.Idiff
+            # Check if both 'Ibias' and 'Idiff' are defined as class attributes
+            if hasattr(self, 'Ibias') and hasattr(self, 'Idiff'):
+                Ibias_values = self.Ibias
+                Idiff_values = self.Idiff
 
-            a.plot(Ibias_values, Idiff_values, label='Real Trip Curve', linestyle='--')
+                a.plot(Ibias_values, Idiff_values, label='Real Trip Curve', linestyle='--')
 
-            # Collect x_values
-            #x_values = np.arange(0, float(max(Ibias_values)), 0.001)
+                # Collect x_values
+                #x_values = np.arange(0, float(max(Ibias_values)), 0.001)
 
-        a.legend()
-        a.set_xlabel('Ibias')
-        a.set_ylabel('Idiff')
+            a.legend()
+            a.set_xlabel('Ibias')
+            a.set_ylabel('Idiff')
 
-        # Embed the plot and toolbar in Tkinter window
-        canvas = FigureCanvasTkAgg(f, master=self.plot_canvas)
-        canvas.draw()
-        canvas.get_tk_widget().pack(side='top', fill='both', expand=True)
+            # Embed the plot and toolbar in Tkinter window
+            canvas = FigureCanvasTkAgg(f, master=self.plot_canvas)
+            canvas.draw()
+            canvas.get_tk_widget().pack(side='top', fill='both', expand=True)
 
-        toolbar = NavigationToolbar2Tk(canvas, self.plot_canvas)
-        toolbar.update()
-        canvas.get_tk_widget().pack(side='top', fill='both', expand=True)
-        toolbar.pack(side='top', fill='both', expand=True)
+            toolbar = NavigationToolbar2Tk(canvas, self.plot_canvas)
+            toolbar.update()
+            canvas.get_tk_widget().pack(side='top', fill='both', expand=True)
+            toolbar.pack(side='top', fill='both', expand=True)
 
     def plot_standardtrip(self):
         # Destroy the previous Tkinter window
@@ -240,32 +243,35 @@ class Difftest:
         intercepts = self.bases
         min_value = self.pick_up
         max_value = self.Highest
-        try:
-            x_values = np.arange(0, float(self.x_max), 0.001)
-        except ValueError as e:
-            messagebox.showerror("Error", f"Invalid X-Max value: {e}")
-            return
+        if self.x_max is None:
+            messagebox.showerror("Error", "Invalid X-Max value: ")
+        else:
+            try:
+                x_values = np.arange(0, float(self.x_max), 0.001)
+            except ValueError as e:
+                messagebox.showerror("Error", f"Invalid X-Max value: {e}")
+                return
 
-        y_values = np.maximum.reduce([slopes * x_values - intercepts for slopes, intercepts in zip(slopes, intercepts)])
-        y_values = np.clip(y_values, min_value, max_value)
+            y_values = np.maximum.reduce([slopes * x_values - intercepts for slopes, intercepts in zip(slopes, intercepts)])
+            y_values = np.clip(y_values, min_value, max_value)
 
-        # Clear previous plot
-        self.plot_canvas.delete("all")
+            # Clear previous plot
+            self.plot_canvas.delete("all")
 
-        a.plot(x_values, y_values, color='black')#plot the standard trip curve
-        a.legend()
-        a.set_xlabel('Ibias')
-        a.set_ylabel('Idiff')
+            a.plot(x_values, y_values, color='black')#plot the standard trip curve
+            a.legend()
+            a.set_xlabel('Ibias')
+            a.set_ylabel('Idiff')
 
-        # Embed the plot and toolbar in Tkinter window
-        canvas = FigureCanvasTkAgg(f, master=self.plot_canvas)
-        canvas.draw()
-        canvas.get_tk_widget().pack(side='top', fill='both', expand=True)
+            # Embed the plot and toolbar in Tkinter window
+            canvas = FigureCanvasTkAgg(f, master=self.plot_canvas)
+            canvas.draw()
+            canvas.get_tk_widget().pack(side='top', fill='both', expand=True)
 
-        toolbar = NavigationToolbar2Tk(canvas, self.plot_canvas)
-        toolbar.update()
-        canvas.get_tk_widget().pack(side='top', fill='both', expand=True)
-        toolbar.pack(side='top', fill='both', expand=True)
+            toolbar = NavigationToolbar2Tk(canvas, self.plot_canvas)
+            toolbar.update()
+            canvas.get_tk_widget().pack(side='top', fill='both', expand=True)
+            toolbar.pack(side='top', fill='both', expand=True)
     
     def show_modify_parameters(self):
         # Create a new window to show and modify parameters
