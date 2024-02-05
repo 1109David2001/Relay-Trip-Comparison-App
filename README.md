@@ -20,6 +20,7 @@ This is a guide on how to use this app correctly and possible issues that may ar
 
 5.After uploading the COMTRADE file, you need to choose to calculate the differential current; if you do not calculate the differential current, you will not be able to plot the real time change and real trip curve.
 <img width="671" alt="image" src="https://github.com/1109David2001/Relay-Trip-Comparison-App/assets/155039981/aa097811-34e7-43a6-a089-a799c5e8bb81">
+
 Section 1：data from CT A or Relay A.  Section 2：data from CT B or Relay B. 
 The user must select three data with the same data length. (If it is from the same type of CT/Relay, there is no need to worry about the data length.) Otherwise the data structure may not be calculated
 <img width="671" alt="image" src="https://github.com/1109David2001/Relay-Trip-Comparison-App/assets/155039981/8151371a-a965-4a18-b7e4-98e4495adc3b">
