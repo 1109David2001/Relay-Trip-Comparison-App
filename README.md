@@ -1,5 +1,4 @@
-I have created an app to help relay protection engineers to quickly determine the state of change of differential current - OMICRON Electronics Technical Assistant.
-Relay-Trip-Comparison APP Version 1（Version 1 is only for Line fault，Version 2 may include transfermoer and CT saturated）
+I built a new version for it. The GUI and functions are changed a lot
 
 This is a guide on how to use this app correctly and possible issues that may arise
 
