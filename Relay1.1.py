@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import filedialog,ttk, messagebox, Toplevel
+from tkinter import filedialog,ttk, messagebox, Toplevel,Entry, StringVar
 import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
@@ -15,6 +15,10 @@ from tkinter import font as tkFont  # 用于字体定义
 from datetime import datetime
 import os
 import matplotlib
+import math
+from threading import Thread, Event
+import time
+
 
 class Difftest:
     def __init__(self, root):
@@ -26,6 +30,7 @@ class Difftest:
         self.pick_up = None
         self.Highest = None
         self.df = None
+        self.done_event = Event()
         #self.parameters = Parameters()  # Create an instance of the Parameters class
         #data from 1st comtrade file
 
@@ -47,8 +52,23 @@ class Difftest:
         self.A=0
         self.time1=[[],[]]
         self.trigger_time1 = [None, None]
+        self.frequency=[None, None]
         self.time=None
         self.Ip1=None
+        self.rotation_matrices = {
+        0: [[1, 0, 0], [0, 1, 0], [0, 0, 1]],
+        30: [[1/math.sqrt(3), 0, -1/math.sqrt(3)], [-1/math.sqrt(3), 1/math.sqrt(3), 0], [0, -1/math.sqrt(3), 1/math.sqrt(3)]],
+        60: [[0, 0, -1], [-1, 0, 0], [0, -1, 0]],
+        90: [[0, 1/math.sqrt(3), -1/math.sqrt(3)], [-1/math.sqrt(3), 0, 1/math.sqrt(3)], [1/math.sqrt(3), -1/math.sqrt(3), 0]],
+        120: [[0, 1, 0], [0, 0, 1], [1, 0, 0]],
+        150: [[-1/math.sqrt(3), 1/math.sqrt(3), 0], [0, -1/math.sqrt(3), 1/math.sqrt(3)], [1/math.sqrt(3), 0, -1/math.sqrt(3)]],
+        180: [[-1, 0, 0], [0, -1, 0], [0, 0, -1]],
+        -30: [[1/math.sqrt(3), -1/math.sqrt(3), 0], [0, 1/math.sqrt(3), -1/math.sqrt(3)], [-1/math.sqrt(3), 0, 1/math.sqrt(3)]],
+        -60: [[0, 0, 1], [1, 0, 0], [0, 1, 0]],
+        -90: [[0, -1/math.sqrt(3), 1/math.sqrt(3)], [1/math.sqrt(3), 0, -1/math.sqrt(3)], [-1/math.sqrt(3), 1/math.sqrt(3), 0]],
+        -120: [[0, -1, 0], [0, 0, -1], [-1, 0, 0]],
+        -150: [[1/math.sqrt(3), -1/math.sqrt(3), 0], [0, 1/math.sqrt(3), -1/math.sqrt(3)], [-1/math.sqrt(3), 0, 1/math.sqrt(3)]],
+    }
 
         default_font = tkFont.nametofont("TkDefaultFont")
         default_font.configure(size=14)  # 调整字体大小为14
@@ -175,12 +195,12 @@ class Difftest:
         
         # Adjust the Ip and Is arrays to synchronize with the selected self.time
         # Note: Assuming self.Ip* and self.Is* arrays are aligned with self.time1[0] initially
-        self.Ip1 = self.Ip1[start_index:start_index + adjusted_length]
-        self.Ip2 = self.Ip2[start_index:start_index + adjusted_length]
-        self.Ip3 = self.Ip3[start_index:start_index + adjusted_length]
-        self.Is1 = self.Is1[start_index:start_index + adjusted_length]
-        self.Is2 = self.Is2[start_index:start_index + adjusted_length]
-        self.Is3 = self.Is3[start_index:start_index + adjusted_length]
+        self.Ip1 = self.Ip1[start_index:start_index + adjusted_length]/self.ratio1
+        self.Ip2 = self.Ip2[start_index:start_index + adjusted_length]/self.ratio1
+        self.Ip3 = self.Ip3[start_index:start_index + adjusted_length]/self.ratio1
+        self.Is1 = self.Is1[start_index:start_index + adjusted_length]/self.ratio2
+        self.Is2 = self.Is2[start_index:start_index + adjusted_length]/self.ratio2
+        self.Is3 = self.Is3[start_index:start_index + adjusted_length]/self.ratio2
 
         # Print results for verification
         print(f"Adjusted start_index for alignment: {start_index}")
@@ -227,6 +247,85 @@ class Difftest:
         self.Ibias_1 = (np.abs(self.Ip1) + np.abs(self.Is1) - np.abs(self.Idiff1)) / self.K1
         self.Ibias_2 = (np.abs(self.Ip2) + np.abs(self.Is2) - np.abs(self.Idiff2)) / self.K1
         self.Ibias_3 = (np.abs(self.Ip3) + np.abs(self.Is3) - np.abs(self.Idiff3)) / self.K1
+    
+    def Eliminate_function(self,I1,I2,I3):
+
+        self.I7,self.I8,self.I9=I1,I2,I3
+        matrix = np.array([[2, -1, -1], [-1, 2, -1], [-1, -1, 2]]) / 3
+        # Create an array from the inputs
+        I = np.array([I1, I2, I3])
+        # Perform the matrix multiplication
+        result = np.dot(matrix, I)
+        new_I1, new_I2, new_I3 = result
+        self.I10=new_I1
+        print("New I: ", result)
+        return new_I1, new_I2, new_I3
+    
+    def apply_phase_rotation(self):
+
+        
+        # Calculate the angle of rotation
+        angle_difference = (self.type2 - self.type1) * 30
+        print(f"Phase shift: {angle_difference} degrees")
+        
+        # Adjust angles greater than 180 degrees
+        if angle_difference > 180:
+            angle_difference -= 360
+        elif angle_difference < -180:
+            angle_difference += 360
+        
+        # Select the corresponding rotation matrix
+        rotation_matrix = self.rotation_matrices[angle_difference]
+        I1=self.Ip1
+        I2=self.Ip2
+        I3=self.Ip3
+        print("I1", I1)
+
+        print("Transfomer Type1: ",self.connection)
+        print("Transfomer Type2: ",self.connection2)
+
+        if 'D' in self.connection:#Eliminate the zero squence
+            I1,I2,I3=self.Eliminate_function(I1,I2,I3)
+        if 'D' in self.connection2:
+            I1,I2,I3=self.Eliminate_function(I1,I2,I3)
+        
+        # Apply the rotation matrix to the initial values
+        self.Ip1 = (rotation_matrix[0][0] * I1 +
+                    rotation_matrix[0][1] * I2 +
+                    rotation_matrix[0][2] * I3)
+        self.Ip2 = (rotation_matrix[1][0] * I1 +
+                    rotation_matrix[1][1] * I2 +
+                    rotation_matrix[1][2] * I3)
+        self.Ip3 = (rotation_matrix[2][0] * I1 +
+                    rotation_matrix[2][1] * I2 +
+                    rotation_matrix[2][2] * I3)
+
+    # The function apply_phase_rotation will now take the self.Is1, self.Is2, and self.Is3 values,
+    # calculate the rotation needed based on self.type1 and self.type2,
+    # and then set the new self.Ip1, self.Ip2, and self.Ip3 values after applying the rotation.
+    # This function is to be a member of a class that contains the mentioned attributes.
+    # The use of self implies that the variables are attributes of the instance of the class in which this function is defined.
+    def show_progress(self):
+        # 创建一个窗口
+        progress_window = tk.Tk()
+        progress_window.title("Progress")
+        
+        # 在窗口中添加一个标签
+        label = tk.Label(progress_window, text="Calculating... Please wait.", font=("Arial", 12))
+        label.pack(pady=20)
+        
+        # 这个函数用于检查事件，如果事件被设置，则关闭窗口
+        def check_event():
+            while not self.done_event.is_set():
+                time.sleep(0.1)
+            progress_window.destroy()
+        
+        # 在新线程中运行检查事件的函数
+        Thread(target=check_event, daemon=True).start()
+        
+        # 显示窗口
+        progress_window.mainloop()
+    
     def calculate_Ibias_New(self):
         try:
             print("Starting calculate_Ibias...")
@@ -235,12 +334,16 @@ class Difftest:
             print(f"Selected Ibias calculation method: {self.method}")
             self.log_to_file(f"Selected Ibias calculation method: {self.method}")
 
-            self.Is1=self.calculate_rms_values(self.Is1)
-            self.Is2=self.calculate_rms_values(self.Is2)
-            self.Is3=self.calculate_rms_values(self.Is3)
-            self.Ip1=self.calculate_rms_values(self.Ip1)
-            self.Ip2=self.calculate_rms_values(self.Ip2)
-            self.Ip3=self.calculate_rms_values(self.Ip3)
+            
+            self.apply_phase_rotation()
+        
+            self.Is1=self.calculate_rms_values_optimized(self.Is1)
+            self.Is2=self.calculate_rms_values_optimized(self.Is2)
+            self.Is3=self.calculate_rms_values_optimized(self.Is3)
+            self.Ip1=self.calculate_rms_values_optimized(self.Ip1)
+            self.Ip2=self.calculate_rms_values_optimized(self.Ip2)
+            self.Ip3=self.calculate_rms_values_optimized(self.Ip3)
+            
 
             
             
@@ -578,6 +681,8 @@ class Difftest:
             ('Is2', 'Is2'),
             ('Ip3', 'Ip3'),
             ('Is3', 'Is3'),
+            #('I1','I7'),
+            #('I10','I10'),
         ]
 
         # 尝试获取时间数据
@@ -625,8 +730,8 @@ class Difftest:
         self.lines = []  # 用于存储线对象以便更新
 
         # 循环变量和相关标签
-        variables = ['I1', 'I2', 'I3', 'I4', 'I5', 'I6']
-        labels = ['Ip1', 'Ip2', 'Ip3', 'Is1', 'Is2', 'Is3']
+        variables = ['I1', 'I2', 'I3', 'I4', 'I5', 'I6']#'I7','I8','I9','I10','I11','I12']
+        labels = ['Ip1', 'Ip2', 'Ip3', 'Is1', 'Is2', 'Is3']#'I1p','I2p','I3p','new_I1p','new_I2p','new_I3p']
 
         # 尝试获取时间数据，此处我们需要两组时间数据
         x_primary = getattr(self.rec[0], 'time', None) if hasattr(self, 'rec') and len(self.rec) > 0 else None
@@ -725,6 +830,76 @@ class Difftest:
             return rms_value
 
         return np.array([calculate_rms(data_list[:i+1]) for i in range(len(data_list))])
+    
+    def calculate_rms_values_optimized(self, data_list):
+        squared_sum = 0
+        rms_values = []
+        for i, value in enumerate(data_list):
+            squared_sum += value**2
+            rms_value = np.sqrt(squared_sum / (i + 1))
+            rms_values.append(rms_value)
+        return np.array(rms_values)
+    
+    def find_peaks_manual(self, signal):
+        peaks = []
+        for i in range(1, len(signal) - 1):
+            if signal[i-1] < signal[i] > signal[i+1]:
+                peaks.append(i)
+        return np.array(peaks)
+
+    def calculate_rms_based_on_time(self, signal, total_time, fre):
+        """
+        Calculate the RMS value of each period in a sine wave signal based on total time and period duration,
+        then create an array of RMS values repeated over each period.
+
+        Args:
+        signal (np.ndarray): The signal array representing the combined sine waves.
+        total_time (float): The total time duration of the signal in seconds.
+        fre:frequency
+
+        Returns:
+        np.ndarray: An array containing the RMS values repeated for each sample in its period.
+        """
+        # Calculate the number of samples per period
+        total_samples = len(signal)
+        print("Number of samples: ", total_samples)
+        samples_per_period = int(total_samples /(fre*total_time))
+        print("Samples per period: ", samples_per_period)
+        # Calculate number of complete periods in the signal
+        num_periods = len(signal) // samples_per_period
+        print("Number of periods: ", num_periods)
+        
+        # Prepare an array to store RMS values
+        rms_values = np.zeros(len(signal))
+        
+        # Iterate over each period
+        for i in range(num_periods):
+            # Extract the period
+            start_index = i * samples_per_period
+            end_index = start_index + samples_per_period
+            period = signal[start_index:end_index]
+            print("Period", period)
+            
+            # Find peaks in the period using the manual method
+            peak_indices = self.find_peaks_manual(period)
+            print("Peak",peak_indices)
+            if len(peak_indices) > 0:
+                max_peak_value = period[peak_indices].max()
+                # Calculate the RMS value, peak divided by sqrt(2)
+                rms_value = max_peak_value / np.sqrt(2)
+                # Repeat this RMS value for the entire period in the output array
+                rms_values[start_index:end_index] = rms_value
+        
+        return rms_values
+
+    # This function call is commented out to prevent execution here
+    # Example usage:
+    # total_time = 10  # seconds, total duration of the signal
+    # period_duration = 0.5  # seconds, duration of one period
+    # full_rms_values = calculate_rms_based_on_time(your_signal_array, total_time, period_duration)
+    # print(full_rms_values)
+
+    
     def plot_standardtrip(self):
         # Destroy the previous Tkinter window
         for widget in self.plot_canvas.winfo_children():
@@ -800,50 +975,42 @@ class Difftest:
 
 ###load rio file
     def parse_rio_content(self, content):
-        self.special_data = {}  # 确保每次都是新的字典
-        data = {}
-        current_section = data
-        section_stack = [data]
-        section_pattern = re.compile(r'^BEGIN\s+(\w+)|^END\s+(\w+)')
-        special_parameters = ['IDIFF>>', 'IDIFF>', 'START', 'LINE', 'STOP','DEFBIAS','BIASDIVISOR']
-        special_data = {}
+        """
+        Parses the content of a RIO file. Each line is parsed to identify the name and corresponding parameters.
+        """
+        self.data=[]  # Reset data storage
+        self.special_data = {}  # Reset special data storage
+        name_count = {}  # Dictionary to keep track of the number of times each name has appeared
+
+        # Define the list of special parameters you're interested in
+        #special_parameters = ['IDIFF>>', 'IDIFF>', 'START3', 'LINE', 'STOP3', 'DEFBIAS', 'BIASDIVISOR']
 
         for line in content.splitlines():
-            #print(f"Processing line: {line}")  # Debug print
-            section_match = section_pattern.match(line)
-            if section_match:
-                section_start, section_end = section_match.groups()
-                if section_start:
-                    #print(f"Starting new section: {section_start}")  # Debug print
-                    new_section = {}
-                    current_section[section_start] = [new_section]
-                    section_stack.append(new_section)
-                    current_section = new_section
-                elif section_end:
-                    #print(f"Ending section: {section_end}")  # Debug print
-                    section_stack.pop()
-                    current_section = section_stack[-1]
+            line = line.strip()
+            # Attempt to split each line into a name and parameters part
+            parts = re.split(r'\s+', line, maxsplit=1)
+            original_name = parts[0]
+            parameters = parts[1] if len(parts) > 1 else ""
+
+            if original_name in name_count:
+                name_count[original_name] += 1
+                name = f"{original_name}{name_count[original_name]}"
             else:
-                parts = line.strip().split('\t', 1)
-                if len(parts) == 2:
-                    key, value = parts
-                    #print(f"Adding key-value pair: {key}: {value}")  # Debug print
-                    current_section[key] = value
-                else:
-                    # Handle lines without a tab character as standalone items
-                    #print(f"Adding standalone line: {line}")  # Debug print
-                    current_section.setdefault('TextLines', []).append(line)
-                    parts = line.strip().split('\t', 1)
-                if len(parts) == 2:
-                    key, value = parts
-                    if key in special_parameters:
-                        special_data[key] = value
-                        self.special_data[key] = value 
-        print("Special Parameters Found:", special_data)
-        self.log_to_file(f"Special Parameters Found: {special_data}")
-        messagebox.showinfo("Success", f"All parameters are loaded.Special Parameters Found: {special_data}")
+                name_count[original_name] = 1
+                name = original_name
+
+            # Add the parsed line to the data storage
+            self.data.append((name, parameters))
+
+            # Check and store special parameters
+          
+            self.special_data[name] = parameters
+
+        # Optionally, log or display the special parameters found
+        print("Special Parameters Found:", self.special_data)
+        self.log_to_file(f"Special Parameters Found: {self.special_data}")
         self.extremes()
-        return data
+
     def extremes(self):
         # 初始化所有值
         self.start = (0, 0)
@@ -851,72 +1018,99 @@ class Difftest:
         self.stop = (0, 0)
 
         try:
-            if 'START' in self.special_data:
-                self.start = self.parse_coordinates(self.special_data['START'])
+            if 'START3' in self.special_data:
+                # 假设START的格式是"数字,数字"，我们需要将其转换为元组(float, float)
+                start_str = self.special_data['START3']
+                self.start = tuple(map(float, start_str.split(',')))
 
             if 'LINE' in self.special_data:
-                self.line = self.parse_coordinates(self.special_data['LINE'])
+                # 同上，处理LINE参数
+                line_str = self.special_data['LINE']
+                self.line = tuple(map(float, line_str.split(',')))
 
-            if 'STOP' in self.special_data:
-                self.stop = self.parse_coordinates(self.special_data['STOP'])
+            if 'STOP3' in self.special_data:
+                # 同上，处理STOP参数
+                stop_str = self.special_data['STOP3']
+                self.stop = tuple(map(float, stop_str.split(',')))
 
+            # 其他参数不需要分割，直接转换类型
             self.Highest = float(self.special_data.get('IDIFF>>', 0))
             self.pick_up = float(self.special_data.get('IDIFF>', 0))
-            self.K1 = float(self.special_data.get('BIASDIVISOR', 0))
+            self.K1 = float(self.special_data.get('BIASDIVISOR', 1))  # Assuming a default value of 1 if not present
             self.method = float(self.special_data.get('DEFBIAS', 0))
-
+            self.ratio1 = float(self.special_data.get('NOM-PD-PH', 1)) / float(self.special_data.get('NOM-CT-PH', 1))*float(self.special_data.get('SN', 1)) /(math.sqrt(3)*float(self.special_data.get('VN', 1)))  # Assuming a default value of 1 if not present
+            self.ratio2 = float(self.special_data.get('NOM-PD-PH2', 1)) / float(self.special_data.get('NOM-CT-PH2', 1))*float(self.special_data.get('SN2', 1)) /(math.sqrt(3)*float(self.special_data.get('VN2', 1)))  # Assuming a default value of 1 if not present
+            self.type1=float(self.special_data.get('CONNECTIONNUMBER', 0))
+            self.type2=float(self.special_data.get('CONNECTIONNUMBER2', 0))
+            self.connection = self.special_data.get('CONNECTION', '')##delta or Y connection
+            self.connection2 = self.special_data.get('CONNECTION2', '')
+            #print("显示数据：", self.special_data['NOM-CT-PH'])
         except ValueError as e:
             print("Error in parsing data:", e)
+            # 确保这个方法存在，或者根据实际情况进行调整
             self.log_to_file(f"Error in parsing data: {e}")
-            
-    def parse_coordinates(self, data):
-        if isinstance(data, str):
-            # Process the string data (assuming it needs to be stripped and split)
-            data = data.strip()
-            x, y = data.split(',')  # or however the string is formatted
-            return float(x), float(y)
-        elif isinstance(data, (list, tuple)) and len(data) == 2:
-            # If data is already a tuple, return it directly
-            return data
-        else:
-            # Handle other cases or invalid data
-            print("Invalid data format for coordinates")
-            self.log_to_file("Invalid data format for coordinates")
-            return None
-
-    def populate_tree(self, tree, parent, data):
-        for key, value in data.items():
-            if isinstance(value, dict):
-                node = tree.insert(parent, 'end', text=key, values=('--',))
-                self.populate_tree(tree, node, value)
-            elif isinstance(value, list):
-                # 处理列表，可能包含嵌套字典或文本行
-                for item in value:
-                    if isinstance(item, dict):
-                        self.populate_tree(tree, parent, item)
-                    else:
-                        # 处理文本行
-                        tree.insert(parent, 'end', text=item, values=('--',))
-            else:
-                tree.insert(parent, 'end', text=key, values=(value,))
-
     def load_file(self):
-        self.file_path = filedialog.askopenfilename(filetypes=[("RIO files", "*.rio"), ("All files", "*.*")])#load RIO format
-        if self.file_path:
+        """
+        Opens a dialog to select a RIO file, then parses and stores its content.
+        """
+        file_path = filedialog.askopenfilename(filetypes=[("RIO files", "*.rio"), ("All files", "*.*")])
+        if file_path:
             try:
-                with open(self.file_path, 'r') as file:
+                with open(file_path, 'r') as file:
                     content = file.read()
-                    self.data = self.parse_rio_content(content)
+                self.parse_rio_content(content)
+                messagebox.showinfo("Success", "File successfully loaded and parsed.")
             except Exception as e:
                 messagebox.showerror("Error", f"Failed to read file: {e}")
 
     def show_data(self):
+        """
+        Displays the parsed data in a new window using a Treeview widget for two-column display
+        and allows direct editing of parameters, with the changes saved back into the original data.
+        """
         if self.data:
             new_window = Toplevel(self.root)
             new_window.title("RIO File Content")
-            tree = ttk.Treeview(new_window, columns=('Value',), show='tree headings')
-            tree.heading('Value', text='Value')
-            self.populate_tree(tree, '', self.data)
+
+            tree = ttk.Treeview(new_window, columns=("Name", "Parameters"), show="headings")
+            tree.heading("Name", text="Name")
+            tree.heading("Parameters", text="Parameters")
+
+            for idx, (name, parameters) in enumerate(self.data):
+                tree.insert("", "end", iid=str(idx), values=(name, parameters))
+
+            def on_double_click(event):
+                for widget in new_window.winfo_children():
+                    if isinstance(widget, Entry):
+                        widget.destroy()
+
+                item_id = tree.identify_row(event.y)
+                column = tree.identify_column(event.x)
+
+                if tree.heading(column, "text") == "Parameters":
+                    x, y, width, height = tree.bbox(item_id, column)
+                    value = tree.set(item_id, column)
+                    entry_var = StringVar(new_window, value=value)
+
+                    entry = Entry(new_window, textvariable=entry_var, bd=0)
+                    entry.place(x=x, y=y, width=width, height=height)
+
+                    def save_edit(event):
+                        new_value = entry_var.get()
+                        tree.set(item_id, column, new_value)
+
+                        # Update self.data with the new value
+                        idx = int(item_id)  # Convert the item_id back to an index
+                        self.data[idx] = (self.data[idx][0], new_value)  # Update the tuple for the edited item
+
+                        entry.destroy()
+
+                    entry.bind("<Return>", save_edit)
+                    entry.bind("<FocusOut>", save_edit)
+                    entry.focus()
+
+            tree.bind("<Double-1>", on_double_click)
+
             tree.pack(expand=True, fill='both', padx=10, pady=10)
         else:
             messagebox.showinfo("Info", "Please load a RIO file first.")
@@ -975,6 +1169,8 @@ class Difftest:
                 print("Real Trigger Time:",self.trigger_time1[section],"Section: ",section)
                 self.log_to_file(f"Real Trigger Time: {self.trigger_time1[section]},Section: {section}")
                 df = self.rec[section].to_dataframe()
+                self.frequency[section]=self.rec[section].frequency
+                print("Frequency:",self.frequency[section],"Section: ",section)
                 self.comtrade_dataframes[section] = df  # Store dataframe
                 #print(self.time)
 
@@ -985,6 +1181,27 @@ class Difftest:
                 if self.comtrade_listboxes[section]:
                     self.refresh_listbox(self.comtrade_listboxes[section], new_content)
 
+
+    def show_progress(event):
+        # 创建一个窗口
+        progress_window = tk.Tk()
+        progress_window.title("Progress")
+        
+        # 在窗口中添加一个标签
+        label = tk.Label(progress_window, text="Calculating... Please wait.", font=("Arial", 12))
+        label.pack(pady=20)
+        
+        # 这个函数用于检查事件，如果事件被设置，则关闭窗口
+        def check_event():
+            while not event.is_set():
+                time.sleep(0.1)
+            progress_window.destroy()
+        
+        # 在新线程中运行检查事件的函数
+        Thread(target=check_event, daemon=True).start()
+        
+        # 显示窗口
+        progress_window.mainloop()
 
     def select_current_New(self):
         # Check if data is loaded in both sections
@@ -1051,6 +1268,7 @@ class Difftest:
             self.calculate_Idiff_New()
             update_output_text()
             self.root.focus()
+            selection_window.destroy()
 
         def update_output_text():
             output_text.delete("1.0", END)
